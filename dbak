@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# Copyright (C) 2019 Marios Tsolekas <marios.tsolekas@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+show_help() {
+    cat <<EOH
+Usage: dbak [OPTIONS] [-c FILE]
+Backup files and folders using rsync
+
+Available options are
+  -h             print this message
+  -c FILE        specify a different configuration file
+
+The configuration file's default location is \$HOME/.config/dbak.conf
+Only absolute paths can be specified and the first non-comment line
+must specify the destination path
+EOH
+}
+
+CONF="$HOME/.config/dbak.conf"
+
+EXE="${0##*/}"
+
+while getopts ":hc:" opt; do
+    case $opt in
+        h)
+            show_help >&2
+            exit 0
+            ;;
+        c)
+            CONF="$OPTARG"
+            ;;
+        :)
+            echo "$EXE: option requires an argument -- $OPTARG" >&2
+            exit 1
+            ;;
+        \?)
+            echo "$EXE: illegal option -- $OPTARG" >&2
+            exit 1
+            ;;
+    esac
+done
+
+shift "$((OPTIND - 1))"
+if [[ -n $1 ]]; then
+    echo "$EXE: too many arguments" >&2
+    exit 1
+fi
+
+if [[ ! -f $CONF ]]; then
+    echo "$EXE: configuration file not found" >&2
+    exit 1
+fi
+
+paths=$(awk '!/^\s*(#|$)/ {$1=$1; print $0}' "$CONF")
+
+while read -r line; do
+    if [[ -z $dst ]]; then
+        dst="$line"
+        echo "Backup destination: $dst"
+        mkdir -p "$dst"
+
+        if [[ ! -d $dst ]]; then
+            echo "$EXE: failed to create destination directory" >&2
+            exit 1
+        elif [[ ! -w $dst ]]; then
+            echo "$EXE: cannot write to destination directory" >&2
+            exit 1
+        fi
+        continue
+    fi
+
+    src="$line"
+    printf "Backing up %s..." "$src"
+    if [[ $src != /* ]]; then
+        echo " Failed (path is not absolute)" >&2
+        continue
+    elif [[ ! -e $src ]]; then
+        echo " Failed (path does not exist)" >&2
+        continue
+    fi
+
+    if [[ -d $src ]]; then
+        src="$src/"
+    fi
+
+    mkdir -p "$(dirname "$dst/$src")"
+    rsync --archive --delete "$src" "$dst/$src"
+    echo " Done"
+done <<< "$paths"

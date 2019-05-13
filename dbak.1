@@ -1,0 +1,55 @@
+.TH man 1 "May 2019" "1.0" "dbak man page"
+
+.SH NAME
+dbak \- backup the files and folders using rsync
+
+.SH SYNOPSIS
+.B dbak [OPTIONS] [-c FILE]
+
+.SH DESCRIPTION
+Backup all files and folders specified in the configuration
+file, using rsync. Essentially this is a simple wrapper around
+rsync to make it easier to perform automatic backups.
+
+The configuration file ignores leading and trailing whitespace,
+empty lines and lines starting with #. All paths must be absolute
+to be valid. The first valid line must specify the destination
+directory and all other lines can be either individual files or
+directory paths, like so:
+
+    # Destination
+    /media/user/external_disk/Backups
+
+    # Some configuration files
+    /home/user/.bashrc
+    /home/user/.nanorc
+
+    # Some directories
+    /home/user/.config/
+    /etc/
+
+.SH OPTIONS
+
+.TP
+.B \-h
+print usage information and exit
+
+.TP
+.B \-c FILE
+specify a different configuration file path
+
+.SH SEE ALSO
+rsync(1)
+
+.SH AUTHOR
+Marios Tsolekas <marios.tsolekas@gmail.com>
+
+.SH REPORTING BUGS
+Report bugs to <https://github.com/mtsolekas/dbak/issues>
+
+.SH COPYRIGHT
+This program is free software. You can redistribute it and/or modify
+it under the terms of the GNU GPL version 3 or (at your option)
+any later version. There is NO warranty, not even MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+See http://gnu.org/licenses/gpl.html

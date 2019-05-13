@@ -1,0 +1,10 @@
+#!/bin/bash
+
+prefix="$1"
+
+if [[ -z $prefix ]]; then
+    prefix="/usr/local/"
+fi
+
+rm "$prefix/bin/dbak"
+rm "$prefix/share/man/man1/dbak.1"

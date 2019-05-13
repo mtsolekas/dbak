@@ -1,0 +1,11 @@
+#!/bin/bash
+
+prefix="$1"
+
+if [[ -z $prefix ]]; then
+    prefix="/usr/local/"
+fi
+
+mkdir -p "$prefix/bin" "$prefix/share/man/man1"
+cp "dbak" "$prefix/bin/dbak"
+cp "dbak.1" "$prefix/share/man/man1/dbak.1"
