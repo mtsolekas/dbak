@@ -1,15 +1,15 @@
-.TH man 1 "May 2019" "1.0" "dbak man page"
+.TH man 1 "Jul 2023" "1.1" "dbak man page"
 
 .SH NAME
-dbak \- backup the files and folders using rsync
+dbak \- backup the files and folders using rsync/borg
 
 .SH SYNOPSIS
-.B dbak [OPTIONS] [-c FILE]
+.B dbak [OPTIONS]
 
 .SH DESCRIPTION
 Backup all files and folders specified in the configuration
 file, using rsync. Essentially this is a simple wrapper around
-rsync to make it easier to perform automatic backups.
+rsync and borg to make it easier to perform automatic backups.
 
 The configuration file ignores leading and trailing whitespace,
 empty lines and lines starting with #. All paths must be absolute
@@ -36,10 +36,23 @@ print usage information and exit
 
 .TP
 .B \-c FILE
-specify a different configuration file path
+specify a different configuration file path. Default is ~/.config/dbak
+
+.TP
+.B \-b
+use borg backup and repositories instead of rsync
+
+.TP
+.B \-r TIME
+borg archive retention, given as an int and unit (1y,3m,...). Default is 3m
+
+.TP
+.B \-z STD[,N]
+compression standard to use for borg archives, optionally with compression
+quality. Default is zstd (Run 'borg help compression' for more details)
 
 .SH SEE ALSO
-rsync(1)
+rsync(1) borg(1) borg-init(1) borg-create(1) borg-prune(1) borg-compact(1)
 
 .SH AUTHOR
 Marios Tsolekas <marios.tsolekas@gmail.com>

@@ -1,7 +1,7 @@
 # dbak
 
 dbak is bash script that automatically performs the specified backups
-in the configuration file, using rsync. For more information about where this
+in the configuration file, using rsync or borg. For more information about where this
 file should be located and how to write it, as well as dbak's
 available options, see the manpage.
 
