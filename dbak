@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 function show_help {
     cat <<EOH
 Usage: dbak [OPTIONS]
@@ -167,6 +166,8 @@ if [[ $BORG = "yes"  && -z $(which borg) ]]; then
 fi
 
 paths=$(awk '!/^\s*(#|$)/ {$1=$1; print $0}' "$CONF")
+
+trap "echo 'Aborting backup'; exit" SIGINT
 
 if [[ $BORG = "no" ]]; then
     rsync_backup
