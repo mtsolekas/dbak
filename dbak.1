@@ -1,4 +1,4 @@
-.TH man 1 "Jul 2023" "1.1" "dbak man page"
+.TH man 1 "Aug 2023" "1.1" "dbak man page"
 
 .SH NAME
 dbak \- backup the files and folders using rsync/borg
@@ -50,6 +50,10 @@ borg archive retention, given as an int and unit (1y,3m,...). Default is 3m
 .B \-z STD[,N]
 compression standard to use for borg archives, optionally with compression
 quality. Default is zstd (Run 'borg help compression' for more details)
+
+.TP
+.B \-e MODE
+set borg encryption mode. Default is repokey (See man 1 borg-init for mroe details)
 
 .SH SEE ALSO
 rsync(1) borg(1) borg-init(1) borg-create(1) borg-prune(1) borg-compact(1)

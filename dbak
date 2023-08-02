@@ -28,6 +28,7 @@ Available options are
                  Default is 3m
   -z STD[,N]     compression standard to use for borg archives, optionally with compression
                  quality. Default is zstd (Run 'borg help compression' for more details)
+  -e MODE        set borg encryption mode. Default is repokey (See man borg-init for mroe details)
 
 The configuration file's default location is \$HOME/.config/dbak.conf
 Only absolute paths can be specified and the first non-comment line
@@ -88,8 +89,16 @@ function borg_backup {
         exit 1
     fi
 
-    echo "Creating borg repository at $dst"
-    borg init --make-parent-dirs --encryption none "$dst"
+    if [[ $ENCRYPTION != "none" ]]; then
+        read -p "Repository password: " -s BORG_PASSPHRASE
+        export BORG_PASSPHRASE
+        echo
+    fi
+
+    if ! grep -q "This is a Borg Backup repository." "$dst/README"; then
+        echo "Creating borg repository at $dst"
+        borg init --make-parent-dirs --encryption "$ENCRYPTION" "$dst"
+    fi
 
     if [[ ! -d $dst ]]; then
         echo "$EXE: failed to create destination directory" >&2
@@ -106,17 +115,18 @@ function borg_backup {
 
     borg compact --progress --cleanup-commits "$dst"
 
-    unset dst borg_paths
+    unset dst borg_paths BORG_PASSPHRASE
 }
 
 CONF="$HOME/.config/dbak.conf"
 BORG="no"
 RETENTION="3m"
 COMPRESSION="zstd"
+ENCRYPTION="repokey"
 
 EXE="${0##*/}"
 
-while getopts ":hc:br:z:" opt; do
+while getopts ":hc:br:z:e:" opt; do
     case $opt in
         h)
             show_help >&2
@@ -133,6 +143,9 @@ while getopts ":hc:br:z:" opt; do
             ;;
         z)
             COMPRESSION="$OPTARG"
+            ;;
+        e)
+            ENCRYPTION="$OPTARG"
             ;;
         :)
             echo "$EXE: option requires an argument -- $OPTARG" >&2
