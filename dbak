@@ -22,6 +22,7 @@ Backup files and folders using rsync or borg
 
 Available options are
   -h             print this message
+  -v             print version
   -c FILE        specify a different configuration file
   -b             use borg backup and repositories instead of rsync
   -r TIME        borg archive retention, given as an int and unit (1y,3m,...).
@@ -126,10 +127,14 @@ ENCRYPTION="repokey"
 
 EXE="${0##*/}"
 
-while getopts ":hc:br:z:e:" opt; do
+while getopts ":hvc:br:z:e:" opt; do
     case $opt in
         h)
             show_help >&2
+            exit 0
+            ;;
+        v)
+            echo "dbak v__VERSION__" >&2
             exit 0
             ;;
         c)
