@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2019 Marios Tsolekas <marios.tsolekas@gmail.com>
+# Copyright (C) 2019, 2023 Marios Tsolekas <marios.tsolekas@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,15 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
-show_help() {
+function show_help {
     cat <<EOH
-Usage: dbak [OPTIONS] [-c FILE]
-Backup files and folders using rsync
+Usage: dbak [OPTIONS]
+Backup files and folders using rsync or borg
 
 Available options are
   -h             print this message
+  -v             print version
   -c FILE        specify a different configuration file
+  -b             use borg backup and repositories instead of rsync
+  -r TIME        borg archive retention, given as an int and unit (1y,3m,...).
+                 Default is 3m
+  -z STD[,N]     compression standard to use for borg archives, optionally with compression
+                 quality. Default is zstd (Run 'borg help compression' for more details)
+  -e MODE        set borg encryption mode. Default is repokey (See man borg-init for mroe details)
 
 The configuration file's default location is \$HOME/.config/dbak.conf
 Only absolute paths can be specified and the first non-comment line
@@ -31,18 +37,120 @@ must specify the destination path
 EOH
 }
 
+function rsync_backup {
+    while read -r line; do
+        if [[ -z $dst ]]; then
+            dst="$line"
+            echo "Backup destination: $dst"
+            mkdir -p "$dst"
+
+            if [[ ! -d $dst ]]; then
+                echo "$EXE: failed to create destination directory" >&2
+                exit 1
+            elif [[ ! -w $dst ]]; then
+                echo "$EXE: cannot write to destination directory" >&2
+                exit 1
+            fi
+
+            if grep -q "This is a Borg Backup repository." "$dst/README"; then
+                echo "$EXE: destination directory is a borg repository" >&2
+                exit 1
+            fi
+            continue
+        fi
+
+        src="$line"
+        printf "Backing up %s..." "$src"
+        if [[ $src != /* ]]; then
+            echo " Failed (path is not absolute)" >&2
+            continue
+        elif [[ ! -e $src ]]; then
+            echo " Failed (path does not exist)" >&2
+            continue
+        fi
+
+        if [[ -d $src ]]; then
+            src="$src/"
+        fi
+
+        mkdir -p "$(dirname "$dst/$src")"
+        rsync --archive --delete "$src" "$dst/$src"
+        echo " Done"
+    done <<< "$paths"
+
+    unset line dst src
+}
+
+function borg_backup {
+    dst="$(head -n1 <<< "$paths")"
+    mapfile -s1 -t borg_paths <<< "$paths"
+
+    if [[ $ENCRYPTION != "none" ]]; then
+        read -p "Repository password: " -s BORG_PASSPHRASE
+        export BORG_PASSPHRASE
+        echo
+    fi
+
+    if borg info "$dst" 2>&1 | grep -q "not a valid repository"; then
+        echo "$EXE: destrination directory exists but is a not a valid borg reposistory" >&2
+        exit 1
+    fi
+
+    if ! grep -q "This is a Borg Backup repository." "$dst/README"; then
+        echo "Creating borg repository at $dst"
+        borg init --make-parent-dirs --encryption "$ENCRYPTION" "$dst"
+    fi
+
+    if [[ ! -d $dst ]]; then
+        echo "$EXE: failed to create destination directory" >&2
+        exit 1
+    elif [[ ! -w $dst ]]; then
+        echo "$EXE: cannot write to destination directory" >&2
+        exit 1
+    fi
+
+    borg create --progress --compression "$COMPRESSION" \
+         "$dst::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" ${borg_paths[*]}
+
+    borg prune --stats --keep-within "$RETENTION" "$dst"
+
+    borg compact --progress --cleanup-commits "$dst"
+
+    unset dst borg_paths BORG_PASSPHRASE
+}
+
 CONF="$HOME/.config/dbak.conf"
+BORG="no"
+RETENTION="3m"
+COMPRESSION="zstd"
+ENCRYPTION="repokey"
 
 EXE="${0##*/}"
 
-while getopts ":hc:" opt; do
+while getopts ":hvc:br:z:e:" opt; do
     case $opt in
         h)
             show_help >&2
             exit 0
             ;;
+        v)
+            echo "dbak v__VERSION__" >&2
+            exit 0
+            ;;
         c)
             CONF="$OPTARG"
+            ;;
+        b)
+            BORG="yes"
+            ;;
+        r)
+            RETENTION="$OPTARG"
+            ;;
+        z)
+            COMPRESSION="$OPTARG"
+            ;;
+        e)
+            ENCRYPTION="$OPTARG"
             ;;
         :)
             echo "$EXE: option requires an argument -- $OPTARG" >&2
@@ -65,40 +173,22 @@ if [[ ! -f $CONF ]]; then
     echo "$EXE: configuration file not found" >&2
     exit 1
 fi
+if [[ $BORG = "no"  && -z $(which rsync) ]]; then
+    echo "$EXE: rsync executable not found" >&2
+    exit 1
+fi
+
+if [[ $BORG = "yes"  && -z $(which borg) ]]; then
+    echo "$EXE: borg executable not found" >&2
+    exit 1
+fi
 
 paths=$(awk '!/^\s*(#|$)/ {$1=$1; print $0}' "$CONF")
 
-while read -r line; do
-    if [[ -z $dst ]]; then
-        dst="$line"
-        echo "Backup destination: $dst"
-        mkdir -p "$dst"
+trap "echo 'Aborting backup'; exit" SIGINT
 
-        if [[ ! -d $dst ]]; then
-            echo "$EXE: failed to create destination directory" >&2
-            exit 1
-        elif [[ ! -w $dst ]]; then
-            echo "$EXE: cannot write to destination directory" >&2
-            exit 1
-        fi
-        continue
-    fi
-
-    src="$line"
-    printf "Backing up %s..." "$src"
-    if [[ $src != /* ]]; then
-        echo " Failed (path is not absolute)" >&2
-        continue
-    elif [[ ! -e $src ]]; then
-        echo " Failed (path does not exist)" >&2
-        continue
-    fi
-
-    if [[ -d $src ]]; then
-        src="$src/"
-    fi
-
-    mkdir -p "$(dirname "$dst/$src")"
-    rsync --archive --delete "$src" "$dst/$src"
-    echo " Done"
-done <<< "$paths"
+if [[ $BORG = "no" ]]; then
+    rsync_backup
+else
+    borg_backup
+fi
