@@ -85,15 +85,15 @@ function borg_backup {
     dst="$(head -n1 <<< "$paths")"
     mapfile -s1 -t borg_paths <<< "$paths"
 
-    if borg info "$dst" 2>&1 | grep -q "not a valid repository"; then
-        echo "$EXE: destrination directory exists but is a not a valid borg reposistory" >&2
-        exit 1
-    fi
-
     if [[ $ENCRYPTION != "none" ]]; then
         read -p "Repository password: " -s BORG_PASSPHRASE
         export BORG_PASSPHRASE
         echo
+    fi
+
+    if borg info "$dst" 2>&1 | grep -q "not a valid repository"; then
+        echo "$EXE: destrination directory exists but is a not a valid borg reposistory" >&2
+        exit 1
     fi
 
     if ! grep -q "This is a Borg Backup repository." "$dst/README"; then
