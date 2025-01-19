@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2019, 2023 Marios Tsolekas <marios.tsolekas@gmail.com>
+# Copyright (C) 2019, 2023, 2025 Marios Tsolekas <marios.tsolekas@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ function borg_backup {
     mapfile -s1 -t borg_paths <<< "$paths"
 
     if [[ $ENCRYPTION != "none" ]]; then
-        read -p "Repository password: " -s BORG_PASSPHRASE
+        read -rp "Repository password: " -s BORG_PASSPHRASE
         export BORG_PASSPHRASE
         echo
     fi
@@ -96,21 +96,32 @@ function borg_backup {
         exit 1
     fi
 
-    if ! grep -q "This is a Borg Backup repository." "$dst/README"; then
+    if echo "$dst" | grep -qvE '[a-zA-Z][a-zA-Z0-9_\-]+\@[a-zA-Z0-9][a-zA-Z0-9_\-]+\:'; then
+        check_prefix=""
+        check_path="$dst"
+    else
+        ssh_host="$(echo "$dst" | grep -oE '[a-zA-Z][a-zA-Z0-9_\-]+\@[a-zA-Z0-9][a-zA-Z0-9_\-]+')"
+        ssh_path="${dst//$ssh_host:/}"
+
+        check_prefix="ssh $ssh_host"
+        check_path="$ssh_path"
+    fi
+
+    if ! $check_prefix grep -q "This is a Borg Backup repository." "$check_path/README" 2>/dev/null; then
         echo "Creating borg repository at $dst"
         borg init --make-parent-dirs --encryption "$ENCRYPTION" "$dst"
     fi
 
-    if [[ ! -d $dst ]]; then
+    if $check_prefix test ! -d "$check_path"; then
         echo "$EXE: failed to create destination directory" >&2
         exit 1
-    elif [[ ! -w $dst ]]; then
+    elif $check_prefix test ! -w "$check_path"; then
         echo "$EXE: cannot write to destination directory" >&2
         exit 1
     fi
 
     borg create --progress --compression "$COMPRESSION" \
-         "$dst::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" ${borg_paths[*]}
+         "$dst::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" "${borg_paths[@]}"
 
     borg prune --stats --keep-within "$RETENTION" "$dst"
 
